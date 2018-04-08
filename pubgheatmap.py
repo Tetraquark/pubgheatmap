@@ -1,6 +1,7 @@
 from pubg_python import PUBG, Shard
 from heatmappy import Heatmapper
 from PIL import Image, ImageDraw
+import sys, getopt
 
 API_KEY = ''
 
@@ -60,7 +61,7 @@ def getTelemetrySafeZonesLocations(telemetry):
 
     return locationsAndRadii
 
-def getMatchHeatmap(match):
+def getMatchHeatmap(api, match):
     """
     Make a heatmap of players activity of the match.
 
@@ -80,11 +81,40 @@ def getMatchHeatmap(match):
 
     return heatmapImg
 
-if __name__ == "__main__":
-    player_name = 'tetraquark'
-    match_number = 2
-    out_heatmap_file_name = 'pubgheatmap58.jpg'
-    server = Shard.PC_EU
+def main(argv):
+    player_name = ''
+    server = None
+    out_heatmap_file_name = ''
+
+    match_number = 0
+
+    try:
+        opts, args = getopt.getopt(argv,"hp:s:o:m:",["playername=","server=","outputfile=","match"])
+    except getopt.GetoptError:
+        print('pubgheatmap.py -p <playername> -s <server> -o <outputfile>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('pubgheatmap.py -p <playername> -s <server> -o <outputfile>')
+            print('Allowed servers: pc-as, pc-eu, pc-krjp, pc-na, pc-oc, pc-sa, pc-sea')
+            print('Example: pubgheatmap.py -p tetraquark -s pc-eu -o heatmap.jpg')
+            print('')
+            sys.exit()
+        elif opt in ("-p", "--playername"):
+            player_name = arg
+        elif opt in ("-s", "--server"):
+            server = Shard(arg)
+        elif opt in ("-o", "--outputfile"):
+            out_heatmap_file_name = arg
+        elif opt in ("-m", "--match"):
+            match_number = int(arg)
+
+    if not player_name or server is None:
+        print('Forgot to enter the player name or server.')
+        print('pubgheatmap.py -p <playername> -s <server> -o <outputfile>')
+        sys.exit(2)
+
+    print('Trying to get data from PUBG servers.')
 
     api = PUBG(API_KEY, server)
 
@@ -97,8 +127,18 @@ if __name__ == "__main__":
     # get required match object
     match = api.matches().get(mathcesIdList[match_number])
 
+    print('Done.')
+    print('Trying to build the match heatmap.')
+
     # get match heatmap (PIL image file)
-    heatmapImg = getMatchHeatmap(match=match)
+    heatmapImg = getMatchHeatmap(api=api, match=match)
+
+    print('Done.')
 
     # save image to the file
+    if not out_heatmap_file_name:
+        out_heatmap_file_name = mathcesIdList[match_number] + '_heatmap.jpg'
     heatmapImg.save(out_heatmap_file_name)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
