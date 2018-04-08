@@ -3,6 +3,7 @@ from heatmappy import Heatmapper
 from PIL import Image, ImageDraw
 import sys, getopt
 import math
+import random
 
 API_KEY = ''
 
@@ -48,7 +49,7 @@ def getTelemetryPlayersCoords(telemetry):
 
 def getTelemetryMapName(telemetry):
     events = telemetry.events_from_type('LogPlayerPosition')
-    return events[0].common.map_name
+    return events[random.randint(0, len(events))].common.map_name
 
 def getTelemetrySafeZonesLocations(telemetry):
     gameStatesEvents = telemetry.events_from_type('LogGameStatePeriodic')
@@ -67,7 +68,7 @@ def getTelemetrySafeZonesLocations(telemetry):
     locationsAndRadii = []
     for key in coordsDict.keys():
         value = coordsDict[key]
-        if value[0] > 3:
+        if value[0] > 4:
             locationsAndRadii.append((value[1], value[2]))
 
     return locationsAndRadii
@@ -97,7 +98,10 @@ def getMatchHeatmap(api, match):
     asset = match.assets[0]
     telemetry = api.telemetry(asset.url)
 
-    mapName = getTelemetryMapName(telemetry)
+    mapName = ''
+    while mapName == '':
+        mapName = getTelemetryMapName(telemetry)
+
     mapImgPath = MAPS_IMGS_PATHS[mapName]
 
     playersCoords = getTelemetryPlayersCoords(telemetry)
