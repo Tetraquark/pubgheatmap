@@ -2,6 +2,7 @@ from pubg_python import PUBG, Shard
 from heatmappy import Heatmapper
 from PIL import Image, ImageDraw
 import sys, getopt
+import math
 
 API_KEY = ''
 
@@ -10,10 +11,20 @@ MIRAMAR_MAP_IMG_PATH = 'data/img/miramar_map.jpg'
 
 MAPS_IMGS_PATHS = {'Desert_Main' : MIRAMAR_MAP_IMG_PATH, 'Erangel_Main' : ERANGEL_MAP_IMG_PATH}
 
-def buildHeatMap(pointsList, circlesCoordsList, imgFile_path):
+def buildHeatMap(pointsList, circlesCoordsList, planePath, imgFile_path):
     mapimg = Image.open(imgFile_path)
 
     draw = ImageDraw.Draw(mapimg)
+
+    # draw line of plane moving
+    if len(planePath) == 2 and planePath[0] is not None and planePath[1] is not None:
+        length = 2000
+        starty = planePath[0][1] - length * math.sin(planePath[1])
+        startx = planePath[0][0] - length * math.cos(planePath[1])
+        endy = planePath[0][1] + length * math.sin(planePath[1])
+        endx = planePath[0][0] + length * math.cos(planePath[1])
+        draw.line(xy=[(startx, starty), (endx, endy)], width=3, fill=(0, 255, 255))
+
     for coordsAndRadius in circlesCoordsList:
         draw.ellipse([coordsAndRadius[0][0] - coordsAndRadius[1], coordsAndRadius[0][1] - coordsAndRadius[1],
                       coordsAndRadius[0][0] + coordsAndRadius[1], coordsAndRadius[0][1] + coordsAndRadius[1]],
@@ -61,6 +72,21 @@ def getTelemetrySafeZonesLocations(telemetry):
 
     return locationsAndRadii
 
+def getTelemetryPlanePath(telemetry):
+    player_positions_events = telemetry.events_from_type('LogPlayerPosition')
+
+    planeZ = max(pke.character.location.z for pke in player_positions_events)
+    positions_on_plane = [pos for pos in player_positions_events if pos.character.location.z == planeZ]
+
+    x0 = positions_on_plane[0].character.location.x
+    y0 = positions_on_plane[0].character.location.y
+    x1 = positions_on_plane[-1].character.location.x
+    y1 = positions_on_plane[-1].character.location.y
+
+    angle = math.atan2(y1 - y0, x1 - x0)
+
+    return [(round(x0 / 600), round(y0 / 600)), angle]
+
 def getMatchHeatmap(api, match):
     """
     Make a heatmap of players activity of the match.
@@ -76,8 +102,9 @@ def getMatchHeatmap(api, match):
 
     playersCoords = getTelemetryPlayersCoords(telemetry)
     circlesCoordsAndRadii = getTelemetrySafeZonesLocations(telemetry)
+    planePath = getTelemetryPlanePath(telemetry)
 
-    heatmapImg = buildHeatMap(playersCoords, circlesCoordsAndRadii, mapImgPath)
+    heatmapImg = buildHeatMap(playersCoords, circlesCoordsAndRadii, planePath, mapImgPath)
 
     return heatmapImg
 
