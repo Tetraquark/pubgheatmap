@@ -1,9 +1,11 @@
 from pubg_python import PUBG, Shard
 from heatmappy import Heatmapper
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageTk
+from collections import defaultdict
 import sys, getopt
 import math
 import random
+import tkinter as tk
 
 API_KEY = ''
 
@@ -73,6 +75,43 @@ def getTelemetrySafeZonesLocations(telemetry):
 
     return locationsAndRadii
 
+def getTelemetryPlayersCoordsByTime(telemetry):
+    player_positions_events = telemetry.events_from_type('LogPlayerPosition')
+    coordinatesDictByTime = defaultdict(list)
+
+    for pke in player_positions_events:
+        if pke.elapsed_time > 0:
+            x = round(pke.character.location.x / 600)
+            y = round(pke.character.location.y / 600)
+            coordinatesDictByTime[pke.elapsed_time].append((x, y))
+
+    return coordinatesDictByTime
+
+def getTelemetrySafeZonesLocationsByTime(telemetry):
+    gameStatesEvents = telemetry.events_from_type('LogGameStatePeriodic')
+
+    zonesDictByTime = dict()
+    for gs in gameStatesEvents:
+        zoneCoords = [round(gs.game_state.safety_zone_position['x'] / 600),
+                      round(gs.game_state.safety_zone_position['y'] / 600),
+                      round(gs.game_state.safety_zone_position['z'])]
+
+        zonesDictByTime[gs.game_state.elapsed_time] = [zoneCoords, round(gs.game_state.safety_zone_radius / 600)]
+
+    return zonesDictByTime
+
+def getTelemetryRedZonesLocationsByTime(telemetry):
+    gameStatesEvents = telemetry.events_from_type('LogGameStatePeriodic')
+
+    zonesDictByTime = dict()
+    for gs in gameStatesEvents:
+        zoneCoords = [round(gs.game_state.red_zone_position['x'] / 600),
+                      round(gs.game_state.red_zone_position['y'] / 600)]
+
+        zonesDictByTime[gs.game_state.elapsed_time] = [zoneCoords, round(gs.game_state.red_zone_radius / 600)]
+
+    return zonesDictByTime
+
 def getTelemetryPlanePath(telemetry):
     player_positions_events = telemetry.events_from_type('LogPlayerPosition')
 
@@ -87,6 +126,36 @@ def getTelemetryPlanePath(telemetry):
     angle = math.atan2(y1 - y0, x1 - x0)
 
     return [(round(x0 / 600), round(y0 / 600)), angle]
+
+def buildTimedHeatMap(pointsList, circlesCoords, redCoords, planePath, imgFile_path):
+    mapimg = Image.open(imgFile_path).convert('RGBA')
+
+    game_events_image = Image.new('RGBA', mapimg.size, (255,255,255,0))
+    draw = ImageDraw.Draw(game_events_image)
+
+    if redCoords[1] > 0:
+        draw.ellipse([redCoords[0][0] - redCoords[1], redCoords[0][1] - redCoords[1],
+                      redCoords[0][0] + redCoords[1], redCoords[0][1] + redCoords[1]],
+                     fill=(255, 0, 0, 50))
+
+    # draw line of plane moving
+    if len(planePath) == 2 and planePath[0] is not None and planePath[1] is not None:
+        length = 2000
+        starty = planePath[0][1] - length * math.sin(planePath[1])
+        startx = planePath[0][0] - length * math.cos(planePath[1])
+        endy = planePath[0][1] + length * math.sin(planePath[1])
+        endx = planePath[0][0] + length * math.cos(planePath[1])
+        draw.line(xy=[(startx, starty), (endx, endy)], width=3, fill=(0, 255, 255))
+
+    draw.ellipse([circlesCoords[0][0] - circlesCoords[1], circlesCoords[0][1] - circlesCoords[1],
+                  circlesCoords[0][0] + circlesCoords[1], circlesCoords[0][1] + circlesCoords[1]],
+                 outline='white')
+
+    mapimg = Image.alpha_composite(mapimg, game_events_image)
+
+    heatmapper = Heatmapper(point_diameter=25, point_strength=1.5, opacity=0.7)
+    heatmapImg = heatmapper.heatmap_on_img(pointsList, mapimg)
+    return heatmapImg
 
 def getMatchHeatmap(api, match):
     """
@@ -112,21 +181,59 @@ def getMatchHeatmap(api, match):
 
     return heatmapImg
 
+def getMatchTimedHeatmap(api, match):
+    """
+    Make a heatmap of players activity of the match distributed by time.
+
+    :param match: pubg_python.match object
+    :return: list of tuples (int, PIL Image)
+    """
+    asset = match.assets[0]
+    telemetry = api.telemetry(asset.url)
+
+    mapName = ''
+    while mapName == '':
+        mapName = getTelemetryMapName(telemetry)
+
+    mapImgPath = MAPS_IMGS_PATHS[mapName]
+
+    playersCoords = getTelemetryPlayersCoordsByTime(telemetry)
+    circlesCoordsAndRadii = getTelemetrySafeZonesLocationsByTime(telemetry)
+    redCoordsAndRadii = getTelemetryRedZonesLocationsByTime(telemetry)
+    planePath = getTelemetryPlanePath(telemetry)
+
+    heatmapImgs = []
+    prevTime = 1
+    # generate map for every game periodic tick
+    for time, _ in circlesCoordsAndRadii.items():
+        repackedPlayerCoords = []
+        # adjust frequent player coords updates to game periodic ticks
+        for t in range(prevTime, time):
+            if t in playersCoords:
+                for coordinates in playersCoords[t]:
+                    repackedPlayerCoords.append(coordinates)
+        heatmapImg = buildTimedHeatMap(repackedPlayerCoords, circlesCoordsAndRadii[time], redCoordsAndRadii[time], planePath, mapImgPath)
+        heatmapImgs.append((time, heatmapImg))
+        prevTime = time
+
+    return heatmapImgs
+
 def main(argv):
     player_name = ''
     server = None
     out_heatmap_file_name = ''
+    timed = False
 
     match_number = 0
 
     try:
-        opts, args = getopt.getopt(argv,"hp:s:o:m:",["playername=","server=","outputfile=","match"])
+        opts, args = getopt.getopt(argv,"hp:s:o:m:t",["playername=","server=","outputfile=","match","timed"])
     except getopt.GetoptError:
         print('pubgheatmap.py -p <playername> -s <server> -o <outputfile>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('pubgheatmap.py -p <playername> -s <server> -o <outputfile>')
+            print('pubgheatmap.py -p <playername> -s <server> [-t/--timed] -o <outputfile>')
             print('Allowed servers: pc-as, pc-eu, pc-krjp, pc-na, pc-oc, pc-sa, pc-sea')
             print('Example: pubgheatmap.py -p tetraquark -s pc-eu -o heatmap.jpg')
             print('')
@@ -139,6 +246,9 @@ def main(argv):
             out_heatmap_file_name = arg
         elif opt in ("-m", "--match"):
             match_number = int(arg)
+        elif opt in ("-t", "--timed"):
+            timed = True
+
 
     if not player_name or server is None:
         print('Forgot to enter the player name or server.')
@@ -159,17 +269,54 @@ def main(argv):
     match = api.matches().get(mathcesIdList[match_number])
 
     print('Done.')
-    print('Trying to build the match heatmap.')
 
-    # get match heatmap (PIL image file)
-    heatmapImg = getMatchHeatmap(api=api, match=match)
+    if not timed:
+        print('Trying to build the match heatmap.')
+        # get match heatmap (PIL image file)
+        heatmapImg = getMatchHeatmap(api=api, match=match)
 
-    print('Done.')
+        # save image to the file
+        if not out_heatmap_file_name:
+            out_heatmap_file_name = mathcesIdList[match_number] + '_heatmap.jpg'
 
-    # save image to the file
-    if not out_heatmap_file_name:
-        out_heatmap_file_name = mathcesIdList[match_number] + '_heatmap.jpg'
-    heatmapImg.save(out_heatmap_file_name)
+        print('Heatmap built. Saving to file', out_heatmap_file_name)
+
+        heatmapImg.save(out_heatmap_file_name)
+
+        print('Done.')
+    else:
+        print('Trying to build the match heatmaps.')
+        # get match heatmaps
+        heatmapImgs = getMatchTimedHeatmap(api=api, match=match)
+
+        def sel(event):
+            panel.config(image=heatmapsPhotoImgsList[int(event)])
+
+        root = tk.Tk()
+
+        heatmapsPhotoImgsList = []
+
+        final_img_size = root.winfo_screenheight() - 60  # 60px for slider
+        if heatmapImgs[0][1].size[0] > final_img_size or heatmapImgs[0][1].size[1] > final_img_size:
+            for time, heatmapImg in heatmapImgs:
+                heatmapsPhotoImgsList.append(ImageTk.PhotoImage(
+                    heatmapImg.resize((final_img_size, final_img_size), Image.ANTIALIAS)))
+        else:
+            for time, heatmapImg in heatmapImgs:
+                heatmapsPhotoImgsList.append(ImageTk.PhotoImage(heatmapImg))
+
+        img = heatmapsPhotoImgsList[0]
+        panel = tk.Label(root, image=img)
+        panel.pack(side="bottom", fill="both", expand="yes")
+
+        var = tk.IntVar()
+        scale = tk.Scale(root, from_=0, to=len(heatmapsPhotoImgsList) - 1, variable=var, orient=tk.HORIZONTAL,
+                          command=sel, width=60, length=final_img_size)
+        scale.pack(anchor=tk.N)
+
+        root.mainloop()
+
+        print('Done.')
 
 if __name__ == "__main__":
     main(sys.argv[1:])
