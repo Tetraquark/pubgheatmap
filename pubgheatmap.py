@@ -35,7 +35,7 @@ def buildHeatMap(pointsList, circlesCoordsList, planePath, imgFile_path):
                       coordsAndRadius[0][0] + coordsAndRadius[1], coordsAndRadius[0][1] + coordsAndRadius[1]],
                      outline='white')
 
-    heatmapper = Heatmapper(point_diameter=25, point_strength=0.2, opacity=0.7)
+    heatmapper = Heatmapper(point_diameter=25, point_strength=0.3, opacity=0.7)
     heatmapImg = heatmapper.heatmap_on_img(pointsList, mapimg)
     return heatmapImg
 
@@ -239,6 +239,7 @@ def main(argv):
             print('Allowed servers: pc-as, pc-eu, pc-krjp, pc-na, pc-oc, pc-sa, pc-sea')
             print('Example of a static match heatmap: pubgheatmap.py -p tetraquark -s pc-eu -o heatmap.jpg')
             print('Example of a timed heatmap: pubgheatmap.py -p tetraquark -s pc-eu -t')
+            print('In timed heatmap frame, you can use the left or right arrow keys to rewind.')
             print('')
             sys.exit()
         elif opt in ("-p", "--playername"):
@@ -293,10 +294,11 @@ def main(argv):
         heatmapImgs = getMatchTimedHeatmap(api=api, match=match)
 
         root = tk.Tk()
+        root.title("pubgheatmap - timed hitmap")
 
         heatmapsPhotoImgsList = []
 
-        final_img_size = root.winfo_screenheight() - 60  # 60px for slider
+        final_img_size = root.winfo_screenheight() - 20  # 20px for slider
         if heatmapImgs[0][1].size[0] > final_img_size or heatmapImgs[0][1].size[1] > final_img_size:
             for time, heatmapImg in heatmapImgs:
                 heatmapsPhotoImgsList.append(ImageTk.PhotoImage(

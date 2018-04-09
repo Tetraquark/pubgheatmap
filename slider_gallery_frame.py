@@ -19,7 +19,7 @@ class SliderGalleryFrame(tk.Frame):
 
         self.var = tk.IntVar()
         self.scale = tk.Scale(root, from_=0, to=len(imagesList) - 1, variable=self.var, orient=tk.HORIZONTAL,
-                         command=self.sel, width=60, length=final_img_size)
+                         command=self.sel, width=20, length=final_img_size)
         self.scale.pack(anchor=tk.N)
 
         self.pack()
