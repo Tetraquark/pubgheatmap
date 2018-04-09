@@ -1,10 +1,14 @@
 # pubgheatmap
 
-Create heatmap image of players activity of the match of PLAYERUNKNOWN'S BATTLEGROUNDS.
+Create static heatmap image or timed heatmap of players activity of the match of PLAYERUNKNOWN'S BATTLEGROUNDS.
 
-Heatmap example:
+Timed heatmap example:
 
-![PUBG activity heatmap](/data/example_heatmap.jpg)
+![PUBG activity timed-heatmap](/data/pubgheatmap_example_timedheatmap.gif)
+
+Static heatmap example:
+
+![PUBG activity static-heatmap](/data/pubgheatmap_example_staticheatmap.jpg)
 
 # Requirements
 
@@ -12,6 +16,7 @@ Python 3
 
 - heatmappy
 - pubg-python
+- tkinter
 
 # How to use
 
@@ -22,7 +27,12 @@ Help message:
 pubgheatmap.py -h
 ```
 
-Gets heatmap of my last match on the EU server:
+To get a static full players activity heatmap image of my last match on the EU server:
 ```
-pubgheatmap.py -p tetraquark -s pc-eu
+pubgheatmap.py -p tetraquark -s pc-eu -o my_static_heatmap.jpg
+```
+
+To get a timed heatmap frame of my last match on the EU server:
+```
+pubgheatmap.py -p tetraquark -s pc-eu -t
 ```
