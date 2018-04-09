@@ -229,7 +229,7 @@ def main(argv):
     match_number = 0
 
     try:
-        opts, args = getopt.getopt(argv,"hp:s:o:m:t",["playername=","server=","outputfile=","match","timed"])
+        opts, args = getopt.getopt(argv,"hp:s:o:m:t",["playername=","server=","outputfile=","match=","timed"])
     except getopt.GetoptError:
         print('pubgheatmap.py -p <playername> -s <server> [-t] [-o <outputfile>]')
         sys.exit(2)
@@ -238,8 +238,8 @@ def main(argv):
             print('pubgheatmap.py -p <playername> -s <server> [-t/--timed] [-o <outputfile>]')
             print('Allowed servers: pc-as, pc-eu, pc-krjp, pc-na, pc-oc, pc-sa, pc-sea')
             print('Example of a static match heatmap: pubgheatmap.py -p tetraquark -s pc-eu -o heatmap.jpg')
-            print('Example of a timed heatmap: pubgheatmap.py -p tetraquark -s pc-eu -t')
-            print('In timed heatmap frame, you can use the left or right arrow keys to rewind.')
+            print('Example of a temporal heatmap: pubgheatmap.py -p tetraquark -s pc-eu -t')
+            print('In temporal heatmap frame, you can use the left or right arrow keys to rewind.')
             print('')
             sys.exit()
         elif opt in ("-p", "--playername"):
@@ -294,7 +294,7 @@ def main(argv):
         heatmapImgs = getMatchTimedHeatmap(api=api, match=match)
 
         root = tk.Tk()
-        root.title("pubgheatmap - timed hitmap")
+        root.title("pubgheatmap - temporal hitmap")
 
         heatmapsPhotoImgsList = []
 
