@@ -153,7 +153,7 @@ def buildTimedHeatMap(pointsList, circlesCoords, redCoords, planePath, imgFile_p
 
     mapimg = Image.alpha_composite(mapimg, game_events_image)
 
-    heatmapper = Heatmapper(point_diameter=25, point_strength=1.5, opacity=0.7)
+    heatmapper = Heatmapper(point_diameter=25, point_strength=0.5, opacity=0.7)
     heatmapImg = heatmapper.heatmap_on_img(pointsList, mapimg)
     return heatmapImg
 
@@ -205,7 +205,7 @@ def getMatchTimedHeatmap(api, match):
     heatmapImgs = []
     prevTime = 1
     # generate map for every game periodic tick
-    for time, _ in circlesCoordsAndRadii.items():
+    for time, _ in sorted(circlesCoordsAndRadii.items()):
         repackedPlayerCoords = []
         # adjust frequent player coords updates to game periodic ticks
         for t in range(prevTime, time):
@@ -229,13 +229,14 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv,"hp:s:o:m:t",["playername=","server=","outputfile=","match","timed"])
     except getopt.GetoptError:
-        print('pubgheatmap.py -p <playername> -s <server> -o <outputfile>')
+        print('pubgheatmap.py -p <playername> -s <server> [-t] [-o <outputfile>]')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('pubgheatmap.py -p <playername> -s <server> [-t/--timed] -o <outputfile>')
+            print('pubgheatmap.py -p <playername> -s <server> [-t/--timed] [-o <outputfile>]')
             print('Allowed servers: pc-as, pc-eu, pc-krjp, pc-na, pc-oc, pc-sa, pc-sea')
-            print('Example: pubgheatmap.py -p tetraquark -s pc-eu -o heatmap.jpg')
+            print('Example of a static match heatmap: pubgheatmap.py -p tetraquark -s pc-eu -o heatmap.jpg')
+            print('Example of a timed heatmap: pubgheatmap.py -p tetraquark -s pc-eu -t')
             print('')
             sys.exit()
         elif opt in ("-p", "--playername"):
