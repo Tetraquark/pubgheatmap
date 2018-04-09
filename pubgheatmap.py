@@ -5,6 +5,8 @@ from collections import defaultdict
 import sys, getopt
 import math
 import random
+
+from slider_gallery_frame import SliderGalleryFrame
 import tkinter as tk
 
 API_KEY = ''
@@ -290,9 +292,6 @@ def main(argv):
         # get match heatmaps
         heatmapImgs = getMatchTimedHeatmap(api=api, match=match)
 
-        def sel(event):
-            panel.config(image=heatmapsPhotoImgsList[int(event)])
-
         root = tk.Tk()
 
         heatmapsPhotoImgsList = []
@@ -305,17 +304,9 @@ def main(argv):
         else:
             for time, heatmapImg in heatmapImgs:
                 heatmapsPhotoImgsList.append(ImageTk.PhotoImage(heatmapImg))
-
-        img = heatmapsPhotoImgsList[0]
-        panel = tk.Label(root, image=img)
-        panel.pack(side="bottom", fill="both", expand="yes")
-
-        var = tk.IntVar()
-        scale = tk.Scale(root, from_=0, to=len(heatmapsPhotoImgsList) - 1, variable=var, orient=tk.HORIZONTAL,
-                          command=sel, width=60, length=final_img_size)
-        scale.pack(anchor=tk.N)
-
-        root.mainloop()
+        # Launching an image gallery with a slider
+        sliderGalleryFrame = SliderGalleryFrame(root, heatmapsPhotoImgsList, final_img_size)
+        sliderGalleryFrame.mainloop()
 
         print('Done.')
 
