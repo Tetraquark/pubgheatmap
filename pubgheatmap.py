@@ -13,8 +13,13 @@ API_KEY = ''
 
 ERANGEL_MAP_IMG_PATH = 'data/img/erangel_map.jpg'
 MIRAMAR_MAP_IMG_PATH = 'data/img/miramar_map.jpg'
+SANHOK_MAP_IMG_PATH = 'data/img/sanhok_map.jpg'
 
-MAPS_IMGS_PATHS = {'Desert_Main' : MIRAMAR_MAP_IMG_PATH, 'Erangel_Main' : ERANGEL_MAP_IMG_PATH}
+MAPS_IMGS_PATHS = {'Desert_Main' : MIRAMAR_MAP_IMG_PATH, 'Erangel_Main' : ERANGEL_MAP_IMG_PATH, "Savage_Main" : SANHOK_MAP_IMG_PATH}
+
+MAP_SCALE_COEFFS = {'Desert_Main' : 600, 'Erangel_Main' : 600, "Savage_Main" : 300}
+
+PLANE_PATH_HEIGHT = 150080
 
 def buildHeatMap(pointsList, circlesCoordsList, planePath, imgFile_path):
     mapimg = Image.open(imgFile_path)
@@ -39,14 +44,14 @@ def buildHeatMap(pointsList, circlesCoordsList, planePath, imgFile_path):
     heatmapImg = heatmapper.heatmap_on_img(pointsList, mapimg)
     return heatmapImg
 
-def getTelemetryPlayersCoords(telemetry):
+def getTelemetryPlayersCoords(telemetry, scale_coeff):
     player_positions_events = telemetry.events_from_type('LogPlayerPosition')
     coordinatesList = []
 
     for pke in player_positions_events:
         if pke.elapsed_time > 0:
-            x = round(pke.character.location.x / 600)
-            y = round(pke.character.location.y / 600)
+            x = round(pke.character.location.x / scale_coeff)
+            y = round(pke.character.location.y / scale_coeff)
             coordinatesList.append((x, y))
 
     return coordinatesList
@@ -55,19 +60,21 @@ def getTelemetryMapName(telemetry):
     events = telemetry.events_from_type('LogPlayerPosition')
     return events[random.randint(0, len(events))].common.map_name
 
-def getTelemetrySafeZonesLocations(telemetry):
+def getTelemetrySafeZonesLocations(telemetry, scale_coeff):
     gameStatesEvents = telemetry.events_from_type('LogGameStatePeriodic')
 
     # need to select circles because api sends a lot of trash (intermediate circles)
     coordsDict = dict()
     for gs in gameStatesEvents:
-        zoneCoords = [round(gs.game_state.safety_zone_position['x']/600), round(gs.game_state.safety_zone_position['y']/600),
+        zoneCoords = [round(gs.game_state.safety_zone_position['x'] / scale_coeff),
+                      round(gs.game_state.safety_zone_position['y'] / scale_coeff),
                       round(gs.game_state.safety_zone_position['z'])]
 
         if zoneCoords[0] in coordsDict:
             coordsDict[zoneCoords[0]][0] += 1
         else:
-            coordsDict[zoneCoords[0]] = [1, zoneCoords, round(gs.game_state.safety_zone_radius/600)]
+            coordsDict[zoneCoords[0]] = [1, zoneCoords, round(
+                gs.game_state.safety_zone_radius / scale_coeff)]
 
     locationsAndRadii = []
     for key in coordsDict.keys():
@@ -77,48 +84,48 @@ def getTelemetrySafeZonesLocations(telemetry):
 
     return locationsAndRadii
 
-def getTelemetryPlayersCoordsByTime(telemetry):
+def getTelemetryPlayersCoordsByTime(telemetry, scale_coeff):
     player_positions_events = telemetry.events_from_type('LogPlayerPosition')
     coordinatesDictByTime = defaultdict(list)
 
     for pke in player_positions_events:
         if pke.elapsed_time > 0:
-            x = round(pke.character.location.x / 600)
-            y = round(pke.character.location.y / 600)
+            x = round(pke.character.location.x / scale_coeff)
+            y = round(pke.character.location.y / scale_coeff)
             coordinatesDictByTime[pke.elapsed_time].append((x, y))
 
     return coordinatesDictByTime
 
-def getTelemetrySafeZonesLocationsByTime(telemetry):
+def getTelemetrySafeZonesLocationsByTime(telemetry, scale_coeff):
     gameStatesEvents = telemetry.events_from_type('LogGameStatePeriodic')
 
     zonesDictByTime = dict()
     for gs in gameStatesEvents:
-        zoneCoords = [round(gs.game_state.safety_zone_position['x'] / 600),
-                      round(gs.game_state.safety_zone_position['y'] / 600),
+        zoneCoords = [round(gs.game_state.safety_zone_position['x'] / scale_coeff),
+                      round(gs.game_state.safety_zone_position['y'] / scale_coeff),
                       round(gs.game_state.safety_zone_position['z'])]
 
-        zonesDictByTime[gs.game_state.elapsed_time] = [zoneCoords, round(gs.game_state.safety_zone_radius / 600)]
+        zonesDictByTime[gs.game_state.elapsed_time] = [zoneCoords, round(gs.game_state.safety_zone_radius / scale_coeff)]
 
     return zonesDictByTime
 
-def getTelemetryRedZonesLocationsByTime(telemetry):
+def getTelemetryRedZonesLocationsByTime(telemetry, scale_coeff):
     gameStatesEvents = telemetry.events_from_type('LogGameStatePeriodic')
 
     zonesDictByTime = dict()
     for gs in gameStatesEvents:
-        zoneCoords = [round(gs.game_state.red_zone_position['x'] / 600),
-                      round(gs.game_state.red_zone_position['y'] / 600)]
+        zoneCoords = [round(gs.game_state.red_zone_position['x'] / scale_coeff),
+                      round(gs.game_state.red_zone_position['y'] / scale_coeff)]
 
-        zonesDictByTime[gs.game_state.elapsed_time] = [zoneCoords, round(gs.game_state.red_zone_radius / 600)]
+        zonesDictByTime[gs.game_state.elapsed_time] = [zoneCoords, round(gs.game_state.red_zone_radius / scale_coeff)]
 
     return zonesDictByTime
 
-def getTelemetryPlanePath(telemetry):
+def getTelemetryPlanePath(telemetry, scale_coeff):
     player_positions_events = telemetry.events_from_type('LogPlayerPosition')
 
-    planeZ = max(pke.character.location.z for pke in player_positions_events)
-    positions_on_plane = [pos for pos in player_positions_events if pos.character.location.z == planeZ]
+    positions_on_plane = [pos for pos in player_positions_events if
+                          pos.character.location.z >= PLANE_PATH_HEIGHT and pos.character.location.z <= PLANE_PATH_HEIGHT + 15]
 
     x0 = positions_on_plane[0].character.location.x
     y0 = positions_on_plane[0].character.location.y
@@ -127,7 +134,7 @@ def getTelemetryPlanePath(telemetry):
 
     angle = math.atan2(y1 - y0, x1 - x0)
 
-    return [(round(x0 / 600), round(y0 / 600)), angle]
+    return [(round(x0 / scale_coeff), round(y0 / scale_coeff)), angle]
 
 def buildTimedHeatMap(pointsList, circlesCoords, redCoords, planePath, imgFile_path):
     mapimg = Image.open(imgFile_path).convert('RGBA')
@@ -169,15 +176,16 @@ def getMatchHeatmap(api, match):
     asset = match.assets[0]
     telemetry = api.telemetry(asset.url)
 
-    mapName = ''
+    mapName = match.map
     while mapName == '':
         mapName = getTelemetryMapName(telemetry)
 
     mapImgPath = MAPS_IMGS_PATHS[mapName]
+    mapScaleCoeff = MAP_SCALE_COEFFS[mapName]
 
-    playersCoords = getTelemetryPlayersCoords(telemetry)
-    circlesCoordsAndRadii = getTelemetrySafeZonesLocations(telemetry)
-    planePath = getTelemetryPlanePath(telemetry)
+    playersCoords = getTelemetryPlayersCoords(telemetry, mapScaleCoeff)
+    circlesCoordsAndRadii = getTelemetrySafeZonesLocations(telemetry, mapScaleCoeff)
+    planePath = getTelemetryPlanePath(telemetry, mapScaleCoeff)
 
     heatmapImg = buildHeatMap(playersCoords, circlesCoordsAndRadii, planePath, mapImgPath)
 
@@ -193,16 +201,17 @@ def getMatchTimedHeatmap(api, match):
     asset = match.assets[0]
     telemetry = api.telemetry(asset.url)
 
-    mapName = ''
+    mapName = match.map
     while mapName == '':
         mapName = getTelemetryMapName(telemetry)
 
     mapImgPath = MAPS_IMGS_PATHS[mapName]
+    mapScaleCoeff = MAP_SCALE_COEFFS[mapName]
 
-    playersCoords = getTelemetryPlayersCoordsByTime(telemetry)
-    circlesCoordsAndRadii = getTelemetrySafeZonesLocationsByTime(telemetry)
-    redCoordsAndRadii = getTelemetryRedZonesLocationsByTime(telemetry)
-    planePath = getTelemetryPlanePath(telemetry)
+    playersCoords = getTelemetryPlayersCoordsByTime(telemetry, mapScaleCoeff)
+    circlesCoordsAndRadii = getTelemetrySafeZonesLocationsByTime(telemetry, mapScaleCoeff)
+    redCoordsAndRadii = getTelemetryRedZonesLocationsByTime(telemetry, mapScaleCoeff)
+    planePath = getTelemetryPlanePath(telemetry, mapScaleCoeff)
 
     heatmapImgs = []
     prevTime = 1
